@@ -6,6 +6,8 @@
         <meta charset="utf-8">
         <title>Main Page</title>
         <script src="/class_definitions.js"></script>
+        <!--  below I've imported this git code for a close button, but I haven't used it -->
+        <!-- <script src="https://gist.github.com/Lulkafe/95a63ddea80d4d02cc4ab8bedd48dfd8.js"></script> -->
         <script type="text/javascript" src="/d3.js"></script>
     </head>
     <body>
@@ -26,7 +28,7 @@
             has (relationship_type, date, group1, group2) */
 
             // setting up a workspace
-            var w = 1000;
+            var w = 2000;
             var h = 500;
             var padding = 100;
             var radius = 15;
@@ -63,7 +65,7 @@
                     processed_data.nodes.push(
                         new group_class(data[i].name, 
                         new Date(data[i].birthday, 00, 01), 
-                        data[i].parent, 0, (i+1) * 50));
+                        data[i].parent, 0, 0));
                 }
 
                 var year_min = d3.min(processed_data.nodes, function(d){
@@ -79,11 +81,13 @@
                 .attr("class", "axis")
                 .call(tAxis);
 
-                // fixing the x positions with the time scale
+                // fixing the x positions with the time scale, and y position based on total number of nodes
 
                 for (i = 0; i < processed_data.nodes.length; i++){
                     processed_data.nodes[i].x = tScale(processed_data.nodes[i].birthday);
+                    processed_data.nodes[i].y = (i+1) * (h/(processed_data.nodes.length+1));
                 };
+
 
                  // tree time!
 
@@ -91,14 +95,18 @@
 
                 // make horizontal lines
 
+                var rectWidth = 100;
+                var rectHeight = h/(processed_data.nodes.length+1) - 5;
+                
                 var timelines = svg.selectAll("node")
                 .data(processed_data.nodes)
                 .enter()
                 .append("line")
-                .attr("x1", function(d) {return d.x})
+                .attr("x1", function(d) {return d.x + rectWidth/2})
                 .attr("y1", function(d) {return d.y})
                 .attr("x2", w-padding + 2.5)
                 .attr("y2", function(d) {return d.y})
+                .attr("fill", "white")
                 .attr("stroke", "black")
                 .attr("marker-end", "url(#arrow)");
 
@@ -120,37 +128,54 @@
                 .attr("stroke", "red")
                 .attr("stroke-width", 5); */
 
-                // make nodes
+                // make node g element to append rectangle and text
 
                 var nodes = svg.selectAll("node")
                 .data(processed_data.nodes)
                 .enter()
-                .append("circle")
+                .append("g")
                 .attr("class", "node")
-                //.attr(circleAttrs)
-                .attr("cx", function(d) {
-                    return d.x
-                })
-                .attr("cy", function(d) {
-                    return d.y
-                })
-                .attr("r", 15)
+                .attr("transform", function(d) {return "translate(" + d.x + "," + d.y + ")"});
+
+                // make node rectangles
+
+                var nodeRect = nodes.selectAll("node")
+                .data(processed_data.nodes)
+                .enter()
+                .append("rect")
+                .attr("class", "node")
+                .attr("x", -rectWidth/2)
+                .attr("y", -rectHeight/2)
+                .attr("width", rectWidth)
+                .attr("height", rectHeight)
+                .attr("rx", rectWidth/20)
+                .attr("opacity", .7)
+                .attr("fill", "ghostwhite")
+                .attr("stroke", "black")
                 .on("mouseover", handleNodeMouseOver)
                 .on("mouseout", handleNodeMouseOut);
+
+                // add on node text
+                // TODO - ADD TEXT WRAPPING
+
+                var nodeText = nodes.select("node")
+                .data(processed_data.nodes)
+                .enter()
+                .append("text")
+                .attr("x", function(d){return d.x - rectWidth/2})
+                .attr("y", function(d){return d.y})
+                .attr("pointer-events", "none")
+                .text(function(d) {return d.name})
+                .attr("font-family", "arial");
 
                 // lets make something happen if we hover
 
                 function handleNodeMouseOver (d, i) {
-                    d3.select(this).attr("r", radius * 2);
-                    tooltip.html(i.name)
-                    .style("left", i.x + 50 + "px")
-                    .style("top", i.y + "px")
-                    .style("opacity", 1);
+                    d3.select(this).attr("opacity", .9).attr("fill", "mediumslateblue");
                 };
 
                 function handleNodeMouseOut (d, i) {
-                    d3.select(this).attr("r", radius);
-                    tooltip.style("opacity", 0);
+                    d3.select(this).attr("opacity", .7).attr("fill", "ghostwhite");
                 }; 
             });
             
