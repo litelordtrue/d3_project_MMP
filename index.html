@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+    <style>
+    </style>
+    <head>
+        <meta charset="utf-8">
+        <title>Main Page</title>
+        <script src="/class_definitions.js"></script>
+        <script type="text/javascript" src="/d3.js"></script>
+    </head>
+    <body>
+        <div id = "main_timeline"></div>
+        <script type="text/javascript">
+            /* THIS IS A REFERENCE FOR MYSELF
+            class group_class is for militant groups
+            has (name, birthday, parent)
+            ideally, child should take an array, as many groups will have more than one child
+
+            ex) var ISIS = new group_class("ISIS", 24, 0, 0);
+
+
+            class event_class is for events (leader changes and major attacks)
+            has (name, event_type, birthday, parent)
+
+            class relationship class is for relationships
+            has (relationship_type, date, group1, group2) */
+
+            // setting up a workspace
+            var w = 1000;
+            var h = 500;
+            var padding = 100;
+            var radius = 15;
+            var svg = d3.select("#main_timeline").append("svg")
+            .attr("width", w).attr("height", h)
+            .attr("style", "outline: thin solid red");
+
+            var parseTime = d3.timeParse("%Y/%m");
+            
+            // creating the (currently) empty dataset
+            var processed_data = {
+                nodes: [],
+                events: {
+                    attacks: [],
+                    leaders: []
+                }
+            };
+
+            // setting up those tooltips
+
+            var tooltip = d3.select("#main_timeline").append("div")
+                .attr("class", "tooltip")
+                .style("opacity", 0)
+                .style("background-color", "white")
+                .style("border", "solid")
+                .style("border-width", "2px")
+                .style("border-radius", "5px")
+                .style("padding", "5px")
+                .style("position", "absolute");
+            
+            d3.csv("/philippines_groups.csv")
+            .then(function(data) {
+                for (i = 0; i < data.length; i++){
+                    processed_data.nodes.push(
+                        new group_class(data[i].name, 
+                        new Date(data[i].birthday, 00, 01), 
+                        data[i].parent, 0, (i+1) * 50));
+                }
+
+                var year_min = d3.min(processed_data.nodes, function(d){
+                    return d.birthday;
+                })
+
+                // defining the time axis
+                tScale = d3.scaleTime().domain([year_min, new Date]).range([padding, w-padding]);
+
+
+                var tAxis = d3.axisBottom(tScale).ticks(20);
+                svg.append("g")
+                .attr("class", "axis")
+                .call(tAxis);
+
+                // fixing the x positions with the time scale
+
+                for (i = 0; i < processed_data.nodes.length; i++){
+                    processed_data.nodes[i].x = tScale(processed_data.nodes[i].birthday);
+                };
+
+                 // tree time!
+
+                // i would like to make an arrowhead on the horizontal lines, but it's pretty low priority
+
+                // make horizontal lines
+
+                var timelines = svg.selectAll("node")
+                .data(processed_data.nodes)
+                .enter()
+                .append("line")
+                .attr("x1", function(d) {return d.x})
+                .attr("y1", function(d) {return d.y})
+                .attr("x2", w-padding + 2.5)
+                .attr("y2", function(d) {return d.y})
+                .attr("stroke", "black")
+                .attr("marker-end", "url(#arrow)");
+
+                // make vertical lines
+
+                /* var links = svg.selectAll("node")
+                .data(processed_data.nodes)
+                .enter()
+                .append("line")
+                .attr("x1", function(d) {return d.x})
+                .attr("y1", function(d) {
+                    if (d.parent == "root") {return d.y}
+                    else {return d.y - radius}})
+                .attr("x2", function(d) {return d.x})
+                .attr("y2", function(d){
+                    if (d.parent == "root") {return d.y}
+                    else {return 0}
+                })
+                .attr("stroke", "red")
+                .attr("stroke-width", 5); */
+
+                // make nodes
+
+                var nodes = svg.selectAll("node")
+                .data(processed_data.nodes)
+                .enter()
+                .append("circle")
+                .attr("class", "node")
+                //.attr(circleAttrs)
+                .attr("cx", function(d) {
+                    return d.x
+                })
+                .attr("cy", function(d) {
+                    return d.y
+                })
+                .attr("r", 15)
+                .on("mouseover", handleNodeMouseOver)
+                .on("mouseout", handleNodeMouseOut);
+
+                // lets make something happen if we hover
+
+                function handleNodeMouseOver (d, i) {
+                    d3.select(this).attr("r", radius * 2);
+                    tooltip.html(i.name)
+                    .style("left", i.x + 50 + "px")
+                    .style("top", i.y + "px")
+                    .style("opacity", 1);
+                };
+
+                function handleNodeMouseOut (d, i) {
+                    d3.select(this).attr("r", radius);
+                    tooltip.style("opacity", 0);
+                }; 
+            });
+            
+            // processing events
+
+            d3.csv("/philippines_events.csv")
+            .then(function(data){
+                for (i = 0; i < data.length; i++){
+                    if (data[i].event_type == "leader"){
+                        processed_data.events.leaders.push(
+                            new event_class(data[i].name, parseTime(data[i].birthday), data[i].parent, 0, 0)
+                        )
+                    }
+                    else if (data[i].event_type == "attack") {
+                        processed_data.events.attacks.push(
+                            new event_class(data[i].name, parseTime(data[i].birthday), data[i].parent, 0, 0)
+                        )
+                    }
+                }
+
+                // updating x positions based on tScale and y positions based on parent
+
+                for (i = 0; i < processed_data.events.attacks.length; i++){
+                    // x position
+                    processed_data.events.attacks[i].x = tScale(processed_data.events.attacks[i].birthday);
+                    // y position
+                    for (j = 0; j < processed_data.nodes.length; j++){
+                        if (processed_data.events.attacks[i].parent === processed_data.nodes[j].name){
+                            processed_data.events.attacks[i].y = processed_data.nodes[j].y;
+                            break;
+                        }
+                    };
+                };
+
+                for (i = 0; i < processed_data.events.leaders.length; i++){
+                    // x position
+                    processed_data.events.leaders[i].x = tScale(processed_data.events.leaders[i].birthday);
+                    // y position
+                    for (j = 0; j < processed_data.nodes.length; j++){
+                        if (processed_data.events.leaders[i].parent === processed_data.nodes[j].name){
+                            processed_data.events.leaders[i].y = processed_data.nodes[j].y;
+                            break;
+                        }
+                    };
+                }
+
+                // lets make some circles
+
+                var attacks = svg.selectAll("attack")
+                .data(processed_data.events.attacks)
+                .enter()
+                .append("circle")
+                .attr("class", "attack")
+                .attr("cx", function(d) {return d.x})
+                .attr("cy", function(d) {return d.y})
+                .attr("r", 5)
+                .attr("fill", "orange")
+                .attr("stroke", "yellow")
+                .on("click", handleEventClick);
+
+                var leaders = svg.selectAll("leader")
+                .data(processed_data.events.leaders)
+                .enter()
+                .append("circle")
+                .attr("class", "leader")
+                .attr("cx", function(d) {return d.x})
+                .attr("cy", function(d) {return d.y})
+                .attr("r", 5)
+                .attr("fill", "grey")
+                .attr("stroke", "black")
+                .on("click", handleEventClick);
+
+
+                // tell me more! function
+
+                function handleEventClick (d,i) {
+                    d3.select(this).attr("r", 10)
+                    tooltip.html(i.name)
+                    .style("left", i.x + 50 + "px")
+                    .style("top", i.y + "px")
+                    .style("opacity", 1);;
+                }
+
+            })
+
+        </script>
+    </body>
+</html>
