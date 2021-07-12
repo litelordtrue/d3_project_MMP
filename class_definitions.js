@@ -19,10 +19,13 @@ class event_class {
 }
 
 class relationship_class {
-    constructor(relationship_type, date, group1, group2) {
+    constructor(relationship_type, date, group1, group2, x, y1, y2) {
         this.relationship_type = relationship_type;
         this.date = date;
         this.group1 = group1;
         this.group2 = group2;
+        this.x = x;
+        this.y1 = y1;
+        this.y2 = y2;
     }
 }
