@@ -4,14 +4,28 @@
     </style>
     <head>
         <meta charset="utf-8">
-        <title>Main Page</title>
+        <title>Mapping Militants</title>
+        <link rel="stylesheet" href="styles.css">
         <script src="/class_definitions.js"></script>
-        <!--  below I've imported this git code for a close button, but I haven't used it -->
-        <!-- <script src="https://gist.github.com/Lulkafe/95a63ddea80d4d02cc4ab8bedd48dfd8.js"></script> -->
+        <script src="/external_javascript.js"></script>
         <script type="text/javascript" src="/d3.js"></script>
     </head>
     <body>
-        <div id = "main_timeline"></div>
+        <div class = "page_wrapper">
+            <!-- <div class = "side_wrapper">
+                <button onclick="closeNav('side_content')"></button>
+                <div class = "side_content">
+                    <p> hello </p>
+                </div>
+            </div> -->
+
+            <div class = "content_wrapper">
+                <p> Toggle Nodes </p>
+                <input type="checkbox" id = "nodeCheckbox" onclick="turnOff('node')"></button>
+                <div id = "main_timeline" class = "main_timeline"></div>
+            </div>
+        </div>   
+        
         <script type="text/javascript">
             /* THIS IS A REFERENCE FOR MYSELF
             class group_class is for militant groups
@@ -28,12 +42,13 @@
             has (relationship_type, date, group1, group2) */
 
             // setting up a workspace
-            var w = 2000;
-            var h = 500;
-            var padding = 100;
+            var w = window.screen.width;
+            var h = 1500;
+            var padding = 50;
             var radius = 15;
             var svg = d3.select("#main_timeline").append("svg")
-            .attr("width", w).attr("height", h)
+            .attr("width", w-padding).attr("height", h)
+            .attr("transform", "translate(10,10)")
             .attr("style", "outline: thin solid red");
 
             var parseTime = d3.timeParse("%Y/%m");
@@ -50,7 +65,8 @@
 
             // setting up those tooltips
 
-            var tooltip = d3.select("#main_timeline").append("div")
+
+            /* var tooltip = d3.select("#main_timeline").append("div")
                 .attr("class", "tooltip")
                 .style("opacity", 0)
                 .style("background-color", "white")
@@ -58,13 +74,13 @@
                 .style("border-width", "2px")
                 .style("border-radius", "5px")
                 .style("padding", "5px")
-                .style("position", "absolute");
+                .style("position", "absolute"); */
             
             d3.csv("/philippines_groups.csv")
             .then(function(data) {
                 for (i = 0; i < data.length; i++){
                     processed_data.nodes.push(
-                        new group_class(data[i].name, 
+                        new group_class(data[i].name, "null",
                         parseTime("" + data[i].birthday + "/01"), 
                         data[i].parent, 0, 0));
                 }
@@ -77,17 +93,21 @@
                 tScale = d3.scaleTime().domain([year_min, new Date]).range([padding, w-padding]);
 
 
-                var tAxis = d3.axisBottom(tScale).ticks(20);
+                var tAxis = d3.axisRight(tScale).ticks(20);
                 svg.append("g")
                 .attr("class", "axis")
                 .call(tAxis);
 
-                // fixing the x positions with the time scale, and y position based on total number of nodes
-
+                // fixing the y positions with the time scale, and x position based on total number of nodes
+                // also fixing the abbreviation
                 for (i = 0; i < processed_data.nodes.length; i++){
-                    processed_data.nodes[i].x = tScale(processed_data.nodes[i].birthday);
-                    processed_data.nodes[i].y = (i+1) * (h/(processed_data.nodes.length+1));
+                    processed_data.nodes[i].y = tScale(processed_data.nodes[i].birthday);
+                    processed_data.nodes[i].x = (i+1) * (h/(processed_data.nodes.length+1));
+
+                    processed_data.nodes[i].abbr = processed_data.nodes[i].name.split(' ').map(function(item){return item[0]}).join('');
                 };
+
+                // defining abbreviations
 
 
                  // tree time!
@@ -96,38 +116,20 @@
 
                 // make horizontal lines
 
-                var rectWidth = 100;
-                var rectHeight = h/(processed_data.nodes.length+1) - 5;
+                var rectWidth = w/(processed_data.nodes.length + 1);
+                var rectHeight = 100;
                 
                 var timelines = svg.selectAll("node")
                 .data(processed_data.nodes)
                 .enter()
                 .append("line")
-                .attr("x1", function(d) {return d.x + rectWidth/2})
-                .attr("y1", function(d) {return d.y})
-                .attr("x2", w-padding + 2.5)
-                .attr("y2", function(d) {return d.y})
+                .attr("x1", function(d) {return d.x})
+                .attr("y1", function(d) {return d.y + rectHeight/2})
+                .attr("x2", function(d) {return d.x})
+                .attr("y2", h-padding)
                 .attr("fill", "white")
                 .attr("stroke", "black")
                 .attr("marker-end", "url(#arrow)");
-
-                // make vertical lines
-
-                /* var links = svg.selectAll("node")
-                .data(processed_data.nodes)
-                .enter()
-                .append("line")
-                .attr("x1", function(d) {return d.x})
-                .attr("y1", function(d) {
-                    if (d.parent == "root") {return d.y}
-                    else {return d.y - radius}})
-                .attr("x2", function(d) {return d.x})
-                .attr("y2", function(d){
-                    if (d.parent == "root") {return d.y}
-                    else {return 0}
-                })
-                .attr("stroke", "red")
-                .attr("stroke-width", 5); */
 
                 // make node g element to append rectangle and text
 
@@ -136,15 +138,15 @@
                 .enter()
                 .append("g")
                 .attr("class", "node")
-                .attr("transform", function(d) {return "translate(" + d.x + "," + d.y + ")"});
+                .attr("transform", function(d) {return "translate(" + d.x + "," + d.y + ")"})
+                .attr("width", rectWidth)
+                .attr("height", rectHeight);
 
                 // make node rectangles
 
-                var nodeRect = nodes.selectAll("node")
+                var nodeRect = nodes
                 .data(processed_data.nodes)
-                .enter()
                 .append("rect")
-                .attr("class", "node")
                 .attr("x", -rectWidth/2)
                 .attr("y", -rectHeight/2)
                 .attr("width", rectWidth)
@@ -156,23 +158,16 @@
                 .on("mouseover", handleNodeMouseOver)
                 .on("mouseout", handleNodeMouseOut);
 
-                // add on node text
-                // TODO - ADD TEXT WRAPPING
-
-                var nodeText = nodes.select("node")
+                var nodeText = nodes
                 .data(processed_data.nodes)
-                .enter()
                 .append("text")
-                .attr("x", function(d){return d.x - rectWidth/2})
-                .attr("y", function(d){return d.y})
-                .attr("pointer-events", "none")
-                .text(function(d) {return d.name})
-                .attr("font-family", "arial");
+                .text(function(d){return d.abbr});
 
                 // lets make something happen if we hover
 
                 function handleNodeMouseOver (d, i) {
                     d3.select(this).attr("opacity", .9).attr("fill", "mediumslateblue");
+                    // heres how you can make stuff disapear! d3.select(this).classed("hide", true);
                 };
 
                 function handleNodeMouseOut (d, i) {
@@ -200,24 +195,24 @@
                 // updating x positions based on tScale and y positions based on parent
 
                 for (i = 0; i < processed_data.events.attacks.length; i++){
-                    // x position
-                    processed_data.events.attacks[i].x = tScale(processed_data.events.attacks[i].birthday);
                     // y position
+                    processed_data.events.attacks[i].y = tScale(processed_data.events.attacks[i].birthday);
+                    // x position
                     for (j = 0; j < processed_data.nodes.length; j++){
                         if (processed_data.events.attacks[i].parent === processed_data.nodes[j].name){
-                            processed_data.events.attacks[i].y = processed_data.nodes[j].y;
+                            processed_data.events.attacks[i].x = processed_data.nodes[j].x;
                             break;
                         }
                     };
                 };
 
                 for (i = 0; i < processed_data.events.leaders.length; i++){
-                    // x position
-                    processed_data.events.leaders[i].x = tScale(processed_data.events.leaders[i].birthday);
                     // y position
+                    processed_data.events.leaders[i].y = tScale(processed_data.events.leaders[i].birthday);
+                    // x position
                     for (j = 0; j < processed_data.nodes.length; j++){
                         if (processed_data.events.leaders[i].parent === processed_data.nodes[j].name){
-                            processed_data.events.leaders[i].y = processed_data.nodes[j].y;
+                            processed_data.events.leaders[i].x = processed_data.nodes[j].x;
                             break;
                         }
                     };
@@ -277,33 +272,34 @@
 
                 for (i = 0; i<processed_data.relationships.length; i++){
                     for (j = 0; j < processed_data.nodes.length; j++){
-                        processed_data.relationships[i].x = tScale(processed_data.relationships[i].date);
+                        processed_data.relationships[i].y = tScale(processed_data.relationships[i].date);
 
                         // var testGroupOne, testGroupTwo = true;
                         if (processed_data.relationships[i].group1 === processed_data.nodes[j].name){
-                            processed_data.relationships[i].y1 = processed_data.nodes[j].y;
+                            processed_data.relationships[i].x1 = processed_data.nodes[j].x;
                         }
                         else if (processed_data.relationships[i].group2 === processed_data.nodes[j].name){
-                            processed_data.relationships[i].y2 = processed_data.nodes[j].y;
+                            processed_data.relationships[i].x2 = processed_data.nodes[j].x;
                         }
                     }
                 }
 
+                 
                 var relationships = svg.selectAll("relationship")
                 .data(processed_data.relationships)
                 .enter()
                 .append("line")
-                .attr("x1", function(d) {return(d.x)})
-                .attr("y1", function(d) {return(d.y1)})
-                .attr("x2", function(d) {return(d.x)})
-                .attr("y2", function(d) {return(d.y2)})
+                .attr("x1", function(d) {return(d.x1)})
+                .attr("y1", function(d) {return(d.y)})
+                .attr("x2", function(d) {return(d.x2)})
+                .attr("y2", function(d) {return(d.y)})
                 .attr("stroke", function(d){
                     if (d.relationship_type === "split"){
                         return "black";
                     }
                     else if (d.relationship_type === "alliance"){
                         return "blue";
-                    }
+                    } 
                 });
             })
 

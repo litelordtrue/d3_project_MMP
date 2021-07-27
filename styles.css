@@ -1,0 +1,21 @@
+body {
+    background-color: #d3d3d3;
+}
+
+.content_wrapper{
+    width: 100vw - 10;
+    height: 100vh - 10;
+    overflow-x: hidden;
+    overflow-y: scroll;
+}
+
+
+
+
+.hide{
+    display: none;
+}
+
+.node_text{
+    word-wrap: break-word;
+}
