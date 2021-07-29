@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+    <style>
+    </style>
+    <head>
+        <meta charset="utf-8">
+        <title>Mapping Militants</title>
+        <link rel="stylesheet" href="styles.css">
+        <script src="/class_definitions.js"></script>
+        <script src="/external_javascript.js"></script>
+        <script type="text/javascript" src="/d3.js"></script>
+    </head>
+    <body>
+        <div class = "page_wrapper">
+            <!-- <div class = "side_wrapper">
+                <button onclick="closeNav('side_content')"></button>
+                <div class = "side_content">
+                    <p> hello </p>
+                </div>
+            </div> -->
+
+            <div class = "content_wrapper">
+                <p> Toggle Nodes </p>
+                <input type="checkbox" id = "nodeCheckbox" onclick="turnOff('node')"></button>
+                <div id = "main_timeline" class = "main_timeline"></div>
+            </div>
+        </div>   
+        
+        <script type="text/javascript">
+            /* THIS IS A REFERENCE FOR MYSELF
+            class group_class is for militant groups
+            has (name, birthday, parent)
+            ideally, child should take an array, as many groups will have more than one child
+
+            ex) var ISIS = new group_class("ISIS", 24, 0, 0);
+
+
+            class event_class is for events (leader changes and major attacks)
+            has (name, event_type, birthday, parent)
+
+            class relationship class is for relationships
+            has (relationship_type, date, group1, group2) */
+
+            // setting up a workspace
+            var w = window.screen.width;
+            var h = 1500;
+            var padding = 50;
+            var radius = 15;
+            var svg = d3.select("#main_timeline").append("svg")
+            .attr("width", w-padding).attr("height", h)
+            .attr("transform", "translate(10,10)")
+            .attr("style", "outline: thin solid red");
+
+            var parseTime = d3.timeParse("%Y/%m");
+            
+            // creating the (currently) empty dataset
+            var processed_data = {
+                nodes: [],
+                events: {
+                    attacks: [],
+                    leaders: []
+                },
+                relationships: []
+            };
+
+            // setting up those tooltips
+
+
+            /* var tooltip = d3.select("#main_timeline").append("div")
+                .attr("class", "tooltip")
+                .style("opacity", 0)
+                .style("background-color", "white")
+                .style("border", "solid")
+                .style("border-width", "2px")
+                .style("border-radius", "5px")
+                .style("padding", "5px")
+                .style("position", "absolute"); */
+            
+
+            d3.csv("/philippines_groups.csv")
+            .then(function(data) {
+                for (i = 0; i < data.length; i++){
+                    processed_data.nodes.push(
+                        new group_class(data[i].name, "null",
+                        parseTime("" + data[i].birthday + "/01"), 
+                        data[i].parent, 0, 0));
+                }
+
+                var year_min = d3.min(processed_data.nodes, function(d){
+                    return d.birthday;
+                })
+
+                // defining the time axis
+                tScale = d3.scaleTime().domain([year_min, new Date]).range([padding, w-padding]);
+
+
+                var tAxis = d3.axisRight(tScale).ticks(20);
+                svg.append("g")
+                .attr("class", "axis")
+                .call(tAxis);
+
+                // fixing the y positions with the time scale, and x position based on total number of nodes
+                // also fixing the abbreviation
+                for (i = 0; i < processed_data.nodes.length; i++){
+                    processed_data.nodes[i].y = tScale(processed_data.nodes[i].birthday);
+                    processed_data.nodes[i].x = (i+1) * (h/(processed_data.nodes.length+1));
+
+                    processed_data.nodes[i].abbr = processed_data.nodes[i].name.split(' ').map(function(item){return item[0]}).join('');
+                };
+
+                // defining abbreviations
+
+
+                 // tree time!
+
+                // i would like to make an arrowhead on the horizontal lines, but it's pretty low priority
+
+                // make horizontal lines
+
+                var rectWidth = w/(processed_data.nodes.length + 1);
+                var rectHeight = 100;
+                
+                var timelines = svg.selectAll("node")
+                .data(processed_data.nodes)
+                .enter()
+                .append("line")
+                .attr("x1", function(d) {return d.x})
+                .attr("y1", function(d) {return d.y + rectHeight/2})
+                .attr("x2", function(d) {return d.x})
+                .attr("y2", h-padding)
+                .attr("fill", "white")
+                .attr("stroke", "black")
+                .attr("marker-end", "url(#arrow)");
+
+                // make node g element to append rectangle and text
+
+                var nodes = svg.selectAll("node")
+                .data(processed_data.nodes)
+                .enter()
+                .append("g")
+                .attr("class", "node")
+                .attr("transform", function(d) {return "translate(" + d.x + "," + d.y + ")"})
+                .attr("width", rectWidth)
+                .attr("height", rectHeight);
+
+                // make node rectangles
+
+                var nodeRect = nodes
+                .data(processed_data.nodes)
+                .append("rect")
+                .attr("x", -rectWidth/2)
+                .attr("y", -rectHeight/2)
+                .attr("width", rectWidth)
+                .attr("height", rectHeight)
+                .attr("rx", rectWidth/20)
+                .attr("opacity", .7)
+                .attr("fill", "ghostwhite")
+                .attr("stroke", "black")
+                .on("mouseover", handleNodeMouseOver)
+                .on("mouseout", handleNodeMouseOut);
+
+                var nodeText = nodes
+                .data(processed_data.nodes)
+                .append("text")
+                .text(function(d){return d.abbr});
+
+                // lets make something happen if we hover
+
+                function handleNodeMouseOver (d, i) {
+                    d3.select(this).attr("opacity", .9).attr("fill", "mediumslateblue");
+                    // heres how you can make stuff disapear! d3.select(this).classed("hide", true);
+                };
+
+                function handleNodeMouseOut (d, i) {
+                    d3.select(this).attr("opacity", .7).attr("fill", "ghostwhite");
+                }; 
+            });
+            
+            // processing events
+
+            d3.csv("/philippines_events.csv")
+            .then(function(data){
+                for (i = 0; i < data.length; i++){
+                    if (data[i].event_type == "leader"){
+                        processed_data.events.leaders.push(
+                            new event_class(data[i].name, parseTime(data[i].birthday), data[i].parent, 0, 0)
+                        )
+                    }
+                    else if (data[i].event_type == "attack") {
+                        processed_data.events.attacks.push(
+                            new event_class(data[i].name, parseTime(data[i].birthday), data[i].parent, 0, 0)
+                        )
+                    }
+                }
+
+                // updating x positions based on tScale and y positions based on parent
+
+                for (i = 0; i < processed_data.events.attacks.length; i++){
+                    // y position
+                    processed_data.events.attacks[i].y = tScale(processed_data.events.attacks[i].birthday);
+                    // x position
+                    for (j = 0; j < processed_data.nodes.length; j++){
+                        if (processed_data.events.attacks[i].parent === processed_data.nodes[j].name){
+                            processed_data.events.attacks[i].x = processed_data.nodes[j].x;
+                            break;
+                        }
+                    };
+                };
+
+                for (i = 0; i < processed_data.events.leaders.length; i++){
+                    // y position
+                    processed_data.events.leaders[i].y = tScale(processed_data.events.leaders[i].birthday);
+                    // x position
+                    for (j = 0; j < processed_data.nodes.length; j++){
+                        if (processed_data.events.leaders[i].parent === processed_data.nodes[j].name){
+                            processed_data.events.leaders[i].x = processed_data.nodes[j].x;
+                            break;
+                        }
+                    };
+                }
+
+                // lets make some circles
+
+                var attacks = svg.selectAll("attack")
+                .data(processed_data.events.attacks)
+                .enter()
+                .append("circle")
+                .attr("class", "attack")
+                .attr("cx", function(d) {return d.x})
+                .attr("cy", function(d) {return d.y})
+                .attr("r", 5)
+                .attr("fill", "orange")
+                .attr("stroke", "yellow")
+                .on("click", handleEventClick);
+
+                var leaders = svg.selectAll("leader")
+                .data(processed_data.events.leaders)
+                .enter()
+                .append("circle")
+                .attr("class", "leader")
+                .attr("cx", function(d) {return d.x})
+                .attr("cy", function(d) {return d.y})
+                .attr("r", 5)
+                .attr("fill", "grey")
+                .attr("stroke", "black")
+                .on("click", handleEventClick);
+
+
+                // tell me more! function
+
+                function handleEventClick (d,i) {
+                    d3.select(this).attr("r", 10)
+                    /* tooltip.html(i.name)
+                    .style("left", i.x + 50 + "px")
+                    .style("top", i.y + "px")
+                    .style("opacity", 1); */
+                }
+            })
+
+            // processing relationships
+
+            d3.csv("/philippines_relationships.csv")
+            .then(function(data){
+                for (i = 0; i < data.length; i++){
+                    processed_data.relationships.push(new relationship_class(
+                        data[i].relationship_type, 
+                        parseTime("" + data[i].date + "/01"),
+                        data[i].group1,
+                        data[i].group2,
+                        0, 0, 0
+                    ))
+                }
+
+                for (i = 0; i<processed_data.relationships.length; i++){
+                    for (j = 0; j < processed_data.nodes.length; j++){
+                        processed_data.relationships[i].y = tScale(processed_data.relationships[i].date);
+
+                        // var testGroupOne, testGroupTwo = true;
+                        if (processed_data.relationships[i].group1 === processed_data.nodes[j].name){
+                            processed_data.relationships[i].x1 = processed_data.nodes[j].x;
+                        }
+                        else if (processed_data.relationships[i].group2 === processed_data.nodes[j].name){
+                            processed_data.relationships[i].x2 = processed_data.nodes[j].x;
+                        }
+                    }
+                }
+
+                 
+                var relationships = svg.selectAll("relationship")
+                .data(processed_data.relationships)
+                .enter()
+                .append("line")
+                .attr("x1", function(d) {return(d.x1)})
+                .attr("y1", function(d) {return(d.y)})
+                .attr("x2", function(d) {return(d.x2)})
+                .attr("y2", function(d) {return(d.y)})
+                .attr("stroke", function(d){
+                    if (d.relationship_type === "split"){
+                        return "black";
+                    }
+                    else if (d.relationship_type === "alliance"){
+                        return "blue";
+                    } 
+                });
+            })
+
+        </script>
+    </body>
+</html>

@@ -1,19 +1,23 @@
 class group_class {
-    constructor(name, abbr, birthday, parent, x, y) {
+    constructor(id, name, abbr, startdate, enddate, active, x, y, description) {
+        this.id = id;
         this.name = name;
         this.abbr = abbr;
-        this.birthday = birthday;
-        this.parent = parent;
+        this.startdate = startdate;
+        this.enddate = enddate;
+        this.active = active;
         this.x = x;
         this.y = y;
+        this.description = description;
     }
 }
 
 class event_class {
-    constructor(name, birthday, parent, x, y) {
-        this.name = name;
-        this.birthday = birthday;
-        this.parent = parent;
+    constructor(id, description, date, parent_id, x, y) {
+        this.id = id;
+        this.description = description;
+        this.date = date;
+        this.parent_id = parent_id;
         this.x = x;
         this.y = y;
     }
