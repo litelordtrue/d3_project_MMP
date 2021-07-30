@@ -13,3 +13,19 @@ function turnOff(classname, checkboxname) {
 function yearToDate(year){
   return parseTime(year + "-01-01");
 }
+
+
+resolutionDict = {
+  "0": "Decade",
+  "1": "5 Years",
+  "2": "Year",
+  "3": "6 Months",
+  "4": "Quarter"
+}
+
+function handleSliderInput(){
+  let slider = document.getElementById("zoomRange");
+  let span = document.getElementById("resolutionText");
+  let resolution=slider.value;
+  span.innerText = resolutionDict[resolution];
+}

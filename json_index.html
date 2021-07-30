@@ -25,7 +25,9 @@
                     <input class="activationCheckbox" type="checkbox" id = "inactiveCheckbox" onclick="turnOff('inactive', 'inactiveCheckbox')" checked="true"> Toggle Inactive Nodes
                     <input class="activationCheckbox" type="checkbox" id = "attackCheckbox" onclick="turnOff('attack', 'attackCheckbox')" checked="true"> Toggle Attacks
                     <input class="activationCheckbox" type="checkbox" id = "leaderCheckbox" onclick="turnOff('leader', 'leaderCheckbox')" checked="true"> Toggle Leaders
+                    <input type="range" min = "0" max = "4" step = "1" value = "2" id = "zoomRange" oninput="handleSliderInput()"> Timeline Resolution: <span id="resolutionText"> Year </span>
                 </div>
+
                 <div id = "main_timeline" class = "main_timeline"></div>
             </div>
         </div>   
@@ -237,7 +239,7 @@
                     console.log(this.id);
                 }
 
-                var littleLine = svg.append("line").attr("x1", 100).attr("x2", w-100).attr("id", "littleLine")
+                /* var littleLine = svg.append("line").attr("x1", 100).attr("x2", w-100).attr("id", "littleLine")
                 .attr("stroke", "cyan");
 
                 var slider = d3.select("#menu_wrapper").append("input").lower()
@@ -252,7 +254,7 @@
                     let new_y = tScale(yearToDate(year));
                     console.log(new_y);
                     littleLine.attr("y1", new_y).attr("y2", new_y);
-                }
+                } */
 
                 // fixing y and x position for relationships
 
