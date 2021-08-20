@@ -21,27 +21,56 @@
 
             <div id = "content_wrapper" class = "content_wrapper">
                 <div id = "menu_wrapper" class = "menu_wrapper">
-                    <input class="activationCheckbox" type="checkbox" id = "nodeCheckbox" onclick="turnOff('node', 'nodeCheckbox')" checked="true"> Toggle All Nodes
-                    <input class="activationCheckbox" type="checkbox" id = "inactiveCheckbox" onclick="turnOff('inactive', 'inactiveCheckbox')" checked="true"> Toggle Inactive Nodes
-                    <input class="activationCheckbox" type="checkbox" id = "attackCheckbox" onclick="turnOff('attack', 'attackCheckbox')" checked="true"> Toggle Attacks
-                    <input class="activationCheckbox" type="checkbox" id = "leaderCheckbox" onclick="turnOff('leader', 'leaderCheckbox')" checked="true"> Toggle Leaders
-                    <input type="range" min = "0" max = "4" step = "1" value = "2" id = "zoomRange" oninput="handleSliderInput()"> Timeline Resolution: <span id="resolutionText"> Year </span>
+                    <input class="activationCheckbox" type="checkbox" id = "nodeCheckbox" onclick="handleCheckbox('node', 'nodeCheckbox')" checked="true"> Toggle All Nodes
+                    <input class="activationCheckbox" type="checkbox" id = "inactiveCheckbox" onclick="handleCheckbox('inactive', 'inactiveCheckbox')" checked="true"> Toggle Inactive Nodes
+                    <input class="activationCheckbox" type="checkbox" id = "attackCheckbox" onclick="handleCheckbox('attack', 'attackCheckbox')" checked="true"> Toggle Attacks
+                    <input class="activationCheckbox" type="checkbox" id = "leaderCheckbox" onclick="handleCheckbox('leader', 'leaderCheckbox')" checked="true"> Toggle Leaders
+                    <input type="range" min = "0" max = "3" step = "1" value = "1" id = "zoomRange" oninput="handleSliderInput()"> Timeline Resolution: <span id="resolutionText"> 1 Year </span>
+                    <button onclick="handleResetInput()">Reset Pan</button>
                 </div>
-
+                <div id = "description_div">
+                    <span id="date_span"></span>
+                    <br><br>
+                    <span id="description_span"></span>
+                </div>
                 <div id = "main_timeline" class = "main_timeline"></div>
             </div>
         </div>   
         
         <script type="text/javascript">
 
+            // moving the div over to replicate real webpage, still not great because its absolute positioning :(
+            var width_ratio = .7;
+
+            var working_div = document.getElementById("main_timeline");
+            working_div.style.position = "absolute";
+            working_div.style.left = ((1-width_ratio)*window.screen.width)+'px';
+            working_div.style.top = 50+'px';
+
+        
             // setting up a workspace
-            var w = window.screen.width;
-            var h = 1500;
+
+            var w = width_ratio * window.screen.width;
+            const default_height = 1500;
+            var h = default_height; // this no longer sets the height of the svg, but rather the height of the elements within it!
             var padding = 50;
             var radius = 15;
-            var svg = d3.select("#main_timeline").append("svg")
-            .attr("width", w-padding).attr("height", h)
+            var svg = d3.select("#main_timeline").append("svg").attr("id", "svg")
+            .attr("height", 500).attr("width", w)
             .attr("style", "outline: thin solid red");
+
+            var main_g = svg.append('g').attr("id", "main_g");
+
+            function handleZoom(e) {
+                d3.select('#main_g').attr("transform", e.transform);
+            }
+
+            let zoom = d3.zoom()
+            .on('zoom', handleZoom)
+            .scaleExtent([.1,1]) // disables zoom
+            .translateExtent([[0,0], [w,h]]); // keeps panning within bounds
+
+            d3.select('svg').call(zoom);
 
             var parseTime = d3.timeParse("%Y-%m-%d"); // to do - need to fix this to deal with dates ending with 00-00. use the endsWith() method
 
@@ -53,10 +82,7 @@
             // creating the (currently) empty dataset
             var processed_data = {
                 nodes: [],
-                events: {
-                    attacks: [],
-                    leaders: []
-                },
+                events: [],
                 relationships: []
             };
 
@@ -76,27 +102,24 @@
                     ))
 
                     let attack_list = data.groups[i].Attack;
-                    if (attack_list.length != 0) {
-                        for (j=0; j < attack_list.length; j++){
-                            let attack = attack_list[j];
-                            processed_data.events.attacks.push(new event_class(
-                                attack.id, attack.description, parseTime(attack.date), attack.group_id,
-                                0, 0
-                            ))
-                        }
-                    }
+                    if (attack_list.length != 0) {for (j=0; j < attack_list.length; j++){
+                        let attack = attack_list[j];
+                        processed_data.events.push(new event_class(
+                            attack.id, "attack", attack.description, parseTime(attack.date), attack.group_id,
+                            0, 0
+                        ))
+                    }}
 
                     let leader_list = data.groups[i].Leader;
-                    if (leader_list.length != 0) {
-                        for (j=0; j < leader_list.length; j++){
-                            let leader = leader_list[j];
-                            processed_data.events.leaders.push(new event_class(
-                                leader.id, leader.description, parseTime(leader.startdate), leader.group_id,
-                                0, 0
-                            ))
-                        }
-                    }
+                    if (leader_list.length != 0) {for (j=0; j < leader_list.length; j++){
+                        let leader = leader_list[j];
+                        processed_data.events.push(new event_class(
+                            leader.id, "leader", leader.description, parseTime(leader.startdate), leader.group_id,
+                            0, 0
+                        ))
+                    }}
                 }
+
                 // reading relationships
                 for (i=0; i<data.links.length; i++){
                     let relationship = data.links[i].Link;
@@ -113,169 +136,11 @@
                     return d.startdate;
                 })
 
-                // defining the time axis
-                // to do - this needs to become dynamic, define a function to do this
+                // defining the time axis FROM THIS POINT ON NEEDS TO BE MIGRATED INSIDE A FUNCTION
 
                 tScale = d3.scaleTime().domain([year_min, todaysDate]).range([padding, h-padding]);
 
-
-                var tAxis = d3.axisRight(tScale).ticks(20);
-                svg.append("g")
-                .attr("class", "axis")
-                .call(tAxis);
-
-                // fixing the y positions with the time scale, and x position based on total number of nodes
-
-                for (i = 0; i < processed_data.nodes.length; i++){
-                    processed_data.nodes[i].y = tScale(processed_data.nodes[i].startdate);
-                    processed_data.nodes[i].x = (i+1) * (h/(processed_data.nodes.length+1));
-                };
-
-                // tree time!
-
-                // i would like to make an arrowhead on the horizontal lines, but it's pretty low priority
-
-                // make horizontal lines
-
-                var rectWidth = w/(processed_data.nodes.length + 1);
-                var rectHeight = 100;
-
-                var timelines = svg.selectAll("node")
-                .data(processed_data.nodes)
-                .enter()
-                .append("line")
-                .attr("x1", function(d) {return d.x})
-                .attr("y1", function(d) {return d.y + rectHeight/2})
-                .attr("x2", function(d) {return d.x})
-                .attr("y2", h-padding)
-                .attr("fill", "white")
-                .attr("stroke", "black")
-                .attr("marker-end", "url(#arrow)");
-            
-                // make node g element to append rectangle and text
-
-                var nodes = svg.selectAll("node")
-                .data(processed_data.nodes)
-                .enter()
-                .append("g")
-                .attr("class", "node")
-                .attr("transform", function(d) {return "translate(" + d.x + "," + d.y + ")"})
-                .attr("width", rectWidth)
-                .attr("height", rectHeight);
-
-                // make node rectangles
-
-                var nodeRect = nodes
-                .data(processed_data.nodes)
-                .append("rect")
-                .attr("x", -rectWidth/2)
-                .attr("y", -rectHeight/2)
-                .attr("width", rectWidth)
-                .attr("height", rectHeight)
-                .attr("rx", rectWidth/20)
-                .attr("opacity", .7)
-                .attr("fill", "ghostwhite")
-                .attr("stroke", "black")
-                .on("mouseover", handleNodeMouseOver)
-                .on("mouseout", handleNodeMouseOut);
-
-                var nodeText = nodes
-                .data(processed_data.nodes)
-                .append("text")
-                .text(function(d){return d.abbr});
-
-                // lets make something happen if we hover
-
-                function handleNodeMouseOver (d, i) {
-                    d3.select(this).attr("opacity", .9).attr("fill", "mediumslateblue");
-                };
-
-                function handleNodeMouseOut (d, i) {
-                    d3.select(this).attr("opacity", .7).attr("fill", "ghostwhite");
-                }; 
-
-                for (i = 0; i < processed_data.events.attacks.length; i++){
-                    // y position
-                    processed_data.events.attacks[i].y = tScale(processed_data.events.attacks[i].date);
-                    // x position
-                    processed_data.events.attacks[i].x = processed_data.nodes.find(element => element.id === processed_data.events.attacks[i].parent_id).x;
-                };
-
-                for (i = 0; i < processed_data.events.leaders.length; i++){
-                    // y position
-                    processed_data.events.leaders[i].y = tScale(processed_data.events.leaders[i].date);
-                    // x position
-                    processed_data.events.leaders[i].x =  processed_data.nodes.find(element => element.id === processed_data.events.leaders[i].parent_id).x;
-                }
-
-                // lets make some circles
-
-                var attacks = svg.selectAll("attack")
-                .data(processed_data.events.attacks)
-                .enter()
-                .append("circle")
-                .attr("class", "attack")
-                .attr("cx", function(d) {return d.x})
-                .attr("cy", function(d) {return d.y})
-                .attr("id", function(d) {return d.id})
-                .attr("r", 5)
-                .on("click", handleEventClick);
-
-                var leaders = svg.selectAll("leader")
-                .data(processed_data.events.leaders)
-                .enter()
-                .append("circle")
-                .attr("class", "leader")
-                .attr("cx", function(d) {return d.x})
-                .attr("cy", function(d) {return d.y})
-                .attr("id", function(d) {return d.id})
-                .attr("r", 5)
-                .on("click", handleEventClick);
-
-
-                // tell me more! function
-
-                function handleEventClick (d,i) { // for some reason, events around here are all having the same description?
-                    console.log(this.id);
-                }
-
-                /* var littleLine = svg.append("line").attr("x1", 100).attr("x2", w-100).attr("id", "littleLine")
-                .attr("stroke", "cyan");
-
-                var slider = d3.select("#menu_wrapper").append("input").lower()
-                .attr("type", "range").attr("id", "rangeSlider")
-                .attr("min", year_min.getFullYear())
-                .attr("max", todaysDate.getFullYear())
-                .on("change", function(d){
-                    updateLine(this.value);
-                });
-
-                function updateLine(year){
-                    let new_y = tScale(yearToDate(year));
-                    console.log(new_y);
-                    littleLine.attr("y1", new_y).attr("y2", new_y);
-                } */
-
-                // fixing y and x position for relationships
-
-                for (i=0; i<processed_data.relationships.length; i++){
-                    let relationship = processed_data.relationships[i];
-                    relationship.y = tScale(relationship.date);
-                    relationship.x1 = processed_data.nodes.find(element => relationship.group1 === element.id).x;
-                    relationship.x2 = processed_data.nodes.find(element => relationship.group2 === element.id).x;
-                }
-
-                // drawing in relationships
-
-                var relationships = svg.selectAll("relationship")
-                .data(processed_data.relationships).enter()
-                .append("line")
-                .attr("class", function(d){return d.relationship_type})
-                .attr("y1", function(d){return d.y})
-                .attr("y2", function(d){return d.y})
-                .attr("x1", function(d){return d.x1})
-                .attr("x2", function(d){return d.x2});
-
+                updateChart();
 
             })
         </script>

@@ -13,8 +13,9 @@ class group_class {
 }
 
 class event_class {
-    constructor(id, description, date, parent_id, x, y) {
+    constructor(id, type, description, date, parent_id, x, y) {
         this.id = id;
+        this.type = type;
         this.description = description;
         this.date = date;
         this.parent_id = parent_id;
